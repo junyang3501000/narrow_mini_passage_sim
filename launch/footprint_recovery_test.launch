@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<launch>
+  <!--
+    完整 footprint 紧急恢复专项测试。
+    右墙内表面约为 y=-0.60 m，车体半宽约 0.35 m；初始 y=-0.22 m 时，
+    右侧净空约 0.03 m，进入 0.05 m 紧急阈值，但模型尚未接触墙体。
+  -->
+  <arg name="gui" default="false"/>
+
+  <!-- 启动本包自己的世界、车辆、雷达桥接和控制器。测试节点稍后通过服务使能任务。 -->
+  <include file="$(find ranger_mini_narrow_sim)/launch/narrow_passage_sim.launch">
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="auto_enable" value="false"/>
+    <arg name="run_test" value="false"/>
+    <arg name="spawn_y" value="-0.22"/>
+    <arg name="spawn_yaw" value="0.0"/>
+  </include>
+
+  <!-- 除 9 m 成功条件外，还必须实际观察到 side_recovery 状态。 -->
+  <node pkg="ranger_mini_narrow_sim"
+        type="sim_smoke_test.py"
+        name="footprint_recovery_smoke_test"
+        output="screen"
+        required="true"
+        args="--timeout 90 --minimum-distance 8.75 --require-side-recovery"/>
+</launch>

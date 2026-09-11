@@ -1,0 +1,65 @@
+# 本文件只覆盖仿真与通用控制器不同的参数；完整默认值在本包 controller_defaults.yaml。
+# 主要算法仍由 Python 实现，YAML 只提供可调参数。
+
+# ===== ROS 接口与坐标系 =====
+lidar_topic: /livox/lidar               # 桥接后的 sensor_msgs/PointCloud2 仿真雷达接口。
+odom_topic: /odom                       # Gazebo 平面运动插件发布的 nav_msgs/Odometry。
+cmd_topic: /cmd_vel                     # 控制器输出和 Gazebo 底盘插件输入，类型 geometry_msgs/Twist。
+status_topic: /narrow_passage/status    # JSON 调试状态，包含墙距、误差、里程和最终命令。
+enable_service: /narrow_mode/enable     # std_srvs/SetBool；true 开新任务，false 立即停车。
+source_frame: livox_frame               # 点云 header.frame_id，必须与 URDF 雷达 frame 相同。
+target_frame: base_link                 # 几何计算统一坐标系：x 前、y 左、z 上。
+
+# ===== 点云转换、采样和看门狗 =====
+# 仿真雷达最多 361×9=3249 条三维射线；规模较小，可保留全部输入点。
+# 射线没有命中物体时不会进入点云，因此实际点数通常小于理论上限。
+point_stride: 1                         # 1 表示不降采样，完整保留向上扇形的有效回波。
+max_points: 4000                        # 单帧上限高于 3249 条理论射线数，并留少量余量。
+lidar_timeout: 0.50                     # 超过 0.5 s 没收到点云就立即停止。
+odom_timeout: 0.50                      # 超过 0.5 s 没收到里程计就立即停止。
+tf_timeout: 0.15                        # 单帧等待 livox_frame->base_link TF 的最长时间。
+# 三维扇形包含地面和高处量测；转入 base_link 后只保留车身高度附近的障碍/墙面点。
+min_obstacle_z: 0.30
+max_obstacle_z: 0.70
+
+# ===== 双墙拟合 =====
+# world 中通道净宽 1.20 m；Ranger Mini 代理模型含轮胎的外宽约 0.70 m。
+min_corridor_width: 1.00                # 拟合宽度小于此值时认为不是目标窄道并停车。
+max_corridor_width: 1.40                # 拟合宽度大于此值时同样拒绝，避免匹配远处杂墙。
+min_total_points: 30                    # 前方有效点不足时整帧无效。
+min_side_points: 12                     # 左右每条墙最少 RANSAC 内点数。
+side_x_min: 0.20                        # 忽略车体附近/雷达自反射，只拟合前方 0.2 m 之后。
+side_x_max: 4.00                        # 墙面拟合最大前视距离。
+min_side_distance: 0.25                 # 排除中心带点，避免前方障碍被误当成侧墙。
+max_side_distance: 2.00                 # 只在车辆左右 2 m 范围寻找墙面。
+min_wall_span: 0.80                     # 每条墙沿 x 至少覆盖 0.8 m，短障碍不能冒充墙。
+wall_confirm_frames: 3                  # 连续三帧双墙有效后才允许运动。
+
+# ===== 居中与航向控制 =====
+# 仿真首轮使用保守速度；单位分别是 m/s、rad/s、m/s²、rad/s²。
+forward_speed: 0.25                     # RUNNING 状态的固定前进目标速度。
+allow_lateral_motion: true              # 允许输出 linear.y；仿真插件将其视为理想车体横移。
+lateral_kp: 0.55                        # 左右墙距离差形成的 ey 到横移速度的比例增益。
+heading_kp: 1.30                        # 两墙平均方向 e_theta 到偏航角速度的比例增益。
+center_angular_kp: 0.0                  # 不把位置误差叠加到转向；位置主要由横移消除。
+max_linear_speed: 0.30                  # |linear.x| 硬上限。
+max_lateral_speed: 0.12                 # |linear.y| 硬上限。
+max_angular_speed: 0.35                 # |angular.z| 硬上限。
+max_linear_accel: 0.35                  # 前进命令每秒最大变化量。
+max_lateral_accel: 0.25                 # 横移命令每秒最大变化量。
+max_angular_accel: 0.60                 # 偏航命令每秒最大变化量。
+
+# ===== 障碍停车与任务完成 =====
+front_stop_distance: 0.65               # 中央安全带最近点不大于 0.65 m 时锁定障碍停车。
+front_resume_distance: 0.85             # 障碍退到 0.85 m 外并连续确认后才恢复，形成迟滞。
+footprint_front_extent: 0.42            # 代理模型前轮外缘距 base_link 约 0.414 m，向上取整。
+footprint_rear_extent: 0.42             # 后轮外缘同样约 0.414 m，和前端构成完整矩形。
+footprint_half_width: 0.35              # 0.583 m 轮距加轮胎宽后，模型总外宽约 0.70 m。
+footprint_emergency_margin: 0.05        # 四角最小拟合墙净空不大于 5 cm 时紧急停车。
+footprint_warning_margin: 0.10          # 四角最小拟合墙净空不大于 10 cm 时降速修正。
+footprint_warning_forward_speed: 0.12   # 预警状态仍保持低速向前并继续修正。
+footprint_recovery_lateral_speed: 0.04  # 紧急停车后一拍，以 4 cm/s 向通道安全侧横移。
+footprint_clear_confirm_frames: 3       # 10 Hz 雷达连续约 0.3 s 安全后恢复正常 vx。
+passage_distance: 9.0                   # 沿任务起始航向的 odom 投影达到 9 m 后进入 SUCCESS。
+mission_timeout: 75.0                   # 任务总超时；包含等待传感器和障碍停车时间。
+max_odom_step: 0.75                     # 相邻 odom 跳变超过 0.75 m 时锁定 FAULT。

@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- ===== 顶层启动选项 ===== -->
+  <!-- true 启动 gzclient 窗口；false 只运行 gzserver，适合自动测试。 -->
+  <arg name="gui" default="true"/>
+  <!-- true 会让物理世界在初始时暂停，便于先检查模型再手动播放。 -->
+  <arg name="paused" default="false"/>
+  <!-- 安全默认 false：所有节点启动后车辆仍保持零速度，必须调用 SetBool 服务。 -->
+  <arg name="auto_enable" default="false"/>
+  <!-- CI 兼容入口；通常由 wsl/test_ros1_sim.sh 使用独立监测节点完成验收。 -->
+  <arg name="run_test" default="false"/>
+  <!-- 起点位移在任务起始车头方向上的投影达到该值后锁定 SUCCESS。 -->
+  <arg name="passage_distance" default="9.0"/>
+
+  <!-- ===== 初始位姿 =====
+       base_link 坐标约定：x 向前、y 向左、yaw 逆时针为正。
+       y=-0.12 表示车在中心线右侧，yaw=0.06 rad≈3.4°，用于同时验证居中和航向闭环。 -->
+  <arg name="spawn_x" default="0.0"/>
+  <arg name="spawn_y" default="-0.12"/>
+  <arg name="spawn_yaw" default="0.06"/>
+
+  <!-- 所有 rospy.Timer、超时和消息时间戳使用 Gazebo 发布的 /clock，而非电脑墙钟。 -->
+  <param name="use_sim_time" value="true"/>
+
+  <!-- ===== Gazebo 世界 =====
+       empty_world.launch 负责启动 gzserver/gzclient；world_name 换成项目自带窄道。 -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find ranger_mini_narrow_sim)/worlds/simple_narrow_corridor.world"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="verbose" value="false"/>
+  </include>
+
+  <!-- ===== 车辆模型与 TF =====
+       先用 xacro 展开轻量 Ranger Mini 模型并写入全局 /robot_description。 -->
+  <param name="robot_description"
+         command="$(find xacro)/xacro '$(find ranger_mini_narrow_sim)/urdf/ranger_mini_proxy.urdf.xacro'"/>
+
+  <!-- 根据 URDF 固定关节发布 base_footprint -> base_link -> livox_frame 等 TF。 -->
+  <node pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        name="robot_state_publisher"
+        output="screen"/>
+
+  <!-- 从 /robot_description 读取 URDF，在指定偏移/航向处生成唯一模型实例。 -->
+  <node pkg="gazebo_ros"
+        type="spawn_model"
+        name="spawn_ranger_mini_proxy"
+        output="screen"
+        args="-urdf -param robot_description -model ranger_mini_proxy -x $(arg spawn_x) -y $(arg spawn_y) -z 0.002 -Y $(arg spawn_yaw)"/>
+
+  <!-- ===== 雷达接口桥接 =====
+       Gazebo 插件输出三维扇形 sensor_msgs/PointCloud；Python 节点转换成内嵌控制器
+       期望的 PointCloud2。
+       output_frame 必须与 URDF 中雷达坐标系、控制器 source_frame 完全一致。 -->
+  <node pkg="ranger_mini_narrow_sim"
+        type="scan_to_livox_cloud.py"
+        name="scan_to_livox_cloud"
+        output="screen">
+    <param name="input_topic" value="/sim_livox_points"/>
+    <param name="cloud_topic" value="/livox/lidar"/>
+    <param name="output_frame" value="livox_frame"/>
+  </node>
+
+  <!-- ===== 主要 Python 控制节点 =====
+       控制器已经收进本包的 src/ranger_mini_narrow_sim，不调用相邻功能包。
+       它直接订阅 /livox/lidar 与 /odom 并发布 /cmd_vel，不经过 move_base/costmap。 -->
+  <node pkg="ranger_mini_narrow_sim"
+        type="ranger_narrow_controller_node.py"
+        name="ranger_narrow_controller"
+        output="screen"
+        required="false">
+    <!-- 两个 YAML 都属于本包：先加载完整默认值，再加载仿真专用覆盖值。 -->
+    <rosparam command="load"
+              file="$(find ranger_mini_narrow_sim)/config/controller_defaults.yaml"/>
+    <rosparam command="load"
+              file="$(find ranger_mini_narrow_sim)/config/simulation.yaml"/>
+    <!-- 单项 <param> 最后加载，优先级高于两个 YAML。 -->
+    <param name="enabled_on_start" value="$(arg auto_enable)"/>
+    <param name="passage_distance" value="$(arg passage_distance)"/>
+  </node>
+
+  <!-- ===== 可选内嵌验收节点 =====
+       required=true 表示验收进程结束后整个 launch 一起退出，适合无人值守运行。
+       minimum-distance=8.75 给 9 m 目标留出状态发布/采样时序余量。 -->
+  <node if="$(arg run_test)"
+        pkg="ranger_mini_narrow_sim"
+        type="sim_smoke_test.py"
+        name="narrow_passage_smoke_test"
+        output="screen"
+        required="true"
+        args="--timeout 80 --minimum-distance 8.75"/>
+</launch>

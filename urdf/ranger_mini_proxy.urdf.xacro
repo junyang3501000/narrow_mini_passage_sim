@@ -1,0 +1,229 @@
+<?xml version="1.0"?>
+<robot name="ranger_mini_proxy" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    用途边界：这是用于感知/控制接口闭环的轻量 Ranger Mini 代理模型，
+    不是轮胎受力、四轮转向执行器或 CAN 底盘的高保真模型。
+    轴距、轮距和轮半径近似参考公开 Ranger Mini V2 模型。
+  -->
+  <!-- ===== 全局几何参数（单位 m） ===== -->
+  <xacro:property name="rm_pi" value="3.141592653589793"/>
+  <xacro:property name="wheelbase" value="0.498"/>
+  <xacro:property name="track" value="0.583"/>
+  <xacro:property name="wheel_radius" value="0.165"/>
+  <xacro:property name="wheel_width" value="0.116"/>
+
+  <!-- ===== 仿真雷达视场参数 =====
+       水平按实车需求限制为车头前方 180°。
+       垂直只保留原 38.4°视场的上半部分，即从水平面 0°向上扫描到 +19.2°；
+       这里使用规则角度网格近似覆盖范围，不复刻 Livox 非重复扫描轨迹。 -->
+  <xacro:property name="lidar_horizontal_fov" value="${rm_pi}"/>
+  <xacro:property name="lidar_upward_fov" value="${19.2 * rm_pi / 180.0}"/>
+  <xacro:property name="lidar_horizontal_samples" value="361"/>
+  <!-- 0°、2.4°……19.2°共 9 层，与之前双向 17 层的角间隔一致。 -->
+  <xacro:property name="lidar_vertical_samples" value="9"/>
+
+  <!-- ===== RViz/Gazebo 可视材质；材质不影响碰撞和动力学 ===== -->
+  <material name="agilex_orange">
+    <color rgba="0.95 0.36 0.05 1.0"/>
+  </material>
+  <material name="dark_grey">
+    <color rgba="0.10 0.11 0.12 1.0"/>
+  </material>
+  <material name="metal_grey">
+    <color rgba="0.35 0.37 0.40 1.0"/>
+  </material>
+  <material name="laser_blue">
+    <color rgba="0.05 0.35 0.90 1.0"/>
+  </material>
+
+  <!--
+    生成均匀长方体惯量：
+    Ixx=m(y²+z²)/12，Iyy=m(x²+z²)/12，Izz=m(x²+y²)/12。
+    视觉/碰撞几何可以有偏移，惯量原点仍相对所属 link 原点。
+  -->
+  <xacro:macro name="box_inertia" params="mass x y z">
+    <inertial>
+      <mass value="${mass}"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="${mass * (y*y + z*z) / 12.0}" ixy="0" ixz="0"
+               iyy="${mass * (x*x + z*z) / 12.0}" iyz="0"
+               izz="${mass * (x*x + y*y) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!--
+    四个车轮共用宏，name 决定 link/joint 名，x/y 决定相对 base_link 的轮心位置。
+    车轮目前是 fixed joint：外形和碰撞体有效，但不模拟真实转向角/滚动速度。
+  -->
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_wheel_link">
+      <inertial>
+        <mass value="2.0"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.015" ixy="0" ixz="0" iyy="0.028" iyz="0" izz="0.015"/>
+      </inertial>
+      <!-- URDF cylinder 默认轴沿 z，绕 x 旋转 90°后轮轴沿车体 y。 -->
+      <visual>
+        <origin rpy="${rm_pi/2.0} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="dark_grey"/>
+      </visual>
+      <collision>
+        <origin rpy="${rm_pi/2.0} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="${name}_wheel_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}_wheel_link"/>
+      <origin xyz="${x} ${y} ${wheel_radius}"/>
+    </joint>
+    <!-- 较低摩擦减少固定轮方向对理想平面插件的干扰。 -->
+    <gazebo reference="${name}_wheel_link">
+      <mu1>0.2</mu1>
+      <mu2>0.2</mu2>
+      <material>Gazebo/Black</material>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ===== 车体坐标树 =====
+       base_footprint 是地面投影，Gazebo odom TF 指向它；base_link 与其原点重合。 -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0"/>
+  </joint>
+
+  <!-- base_link 承载车身惯量、显示外壳和主体碰撞盒。 -->
+  <link name="base_link">
+    <xacro:box_inertia mass="48.0" x="0.76" y="0.48" z="0.22"/>
+    <visual name="lower_chassis">
+      <origin xyz="0 0 0.235"/>
+      <geometry><box size="0.76 0.48 0.22"/></geometry>
+      <material name="agilex_orange"/>
+    </visual>
+    <visual name="upper_deck">
+      <origin xyz="-0.03 0 0.375"/>
+      <geometry><box size="0.54 0.38 0.09"/></geometry>
+      <material name="dark_grey"/>
+    </visual>
+    <visual name="front_bumper">
+      <origin xyz="0.405 0 0.205"/>
+      <geometry><box size="0.05 0.50 0.11"/></geometry>
+      <material name="metal_grey"/>
+    </visual>
+    <visual name="rear_bumper">
+      <origin xyz="-0.405 0 0.205"/>
+      <geometry><box size="0.05 0.50 0.11"/></geometry>
+      <material name="metal_grey"/>
+    </visual>
+    <!-- 主体碰撞盒只近似车身；四个轮胎另有圆柱碰撞体，共同构成当前 3D footprint。 -->
+    <collision>
+      <origin xyz="0 0 0.235"/>
+      <geometry><box size="0.76 0.48 0.22"/></geometry>
+    </collision>
+  </link>
+
+  <!-- 轮位命名：front/rear 表示 x 正/负，left/right 表示 y 正/负。 -->
+  <xacro:wheel name="front_left"  x="${ wheelbase/2.0}" y="${ track/2.0}"/>
+  <xacro:wheel name="front_right" x="${ wheelbase/2.0}" y="${-track/2.0}"/>
+  <xacro:wheel name="rear_left"   x="${-wheelbase/2.0}" y="${ track/2.0}"/>
+  <xacro:wheel name="rear_right"  x="${-wheelbase/2.0}" y="${-track/2.0}"/>
+
+  <!-- ===== 雷达代理 =====
+       单个雷达位于车体前方 0.18 m、高 0.50 m；没有独立左后/右后雷达。 -->
+  <link name="livox_frame">
+    <xacro:box_inertia mass="0.5" x="0.09" y="0.09" z="0.07"/>
+    <visual>
+      <geometry><cylinder radius="0.055" length="0.07"/></geometry>
+      <material name="laser_blue"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.055" length="0.07"/></geometry>
+    </collision>
+  </link>
+  <joint name="livox_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="livox_frame"/>
+    <origin xyz="0.18 0 0.50"/>
+  </joint>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Orange</material>
+  </gazebo>
+  <!--
+    Gazebo ray 传感器生成前向三维扇形射线：
+      - 水平 -90°~+90°，361 列；
+      - 垂直 0°~+19.2°，9 层，只向上扫描；
+      - 10 Hz，量程 0.08~12 m。
+    gazebo_ros_block_laser 发布旧式 sensor_msgs/PointCloud，launch 中的 Python 桥接节点
+    再转换为控制算法和实车 Livox 驱动共同使用的 sensor_msgs/PointCloud2。
+  -->
+  <gazebo reference="livox_frame">
+    <material>Gazebo/Blue</material>
+    <sensor type="ray" name="livox_proxy_fan_lidar">
+      <always_on>true</always_on>
+      <update_rate>10.0</update_rate>
+      <visualize>true</visualize>
+      <pose>0 0 0 0 0 0</pose>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>${lidar_horizontal_samples}</samples>
+            <resolution>1</resolution>
+            <min_angle>-${lidar_horizontal_fov / 2.0}</min_angle>
+            <max_angle>${lidar_horizontal_fov / 2.0}</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>${lidar_vertical_samples}</samples>
+            <resolution>1</resolution>
+            <min_angle>0.0</min_angle>
+            <max_angle>${lidar_upward_fov}</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.08</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <!-- 3 mm 标准差的高斯噪声用于避免测试只覆盖完全理想直线。 -->
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.003</stddev>
+        </noise>
+      </ray>
+      <plugin name="gazebo_ros_livox_fan_proxy" filename="libgazebo_ros_block_laser.so">
+        <robotNamespace>/</robotNamespace>
+        <!-- 插件输出 sensor_msgs/PointCloud；桥接后才成为 /livox/lidar PointCloud2。 -->
+        <topicName>sim_livox_points</topicName>
+        <frameName>livox_frame</frameName>
+        <!-- 射线本体已配置 3 mm 噪声，此处不再重复叠加。 -->
+        <gaussianNoise>0.0</gaussianNoise>
+        <updateRate>10.0</updateRate>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!--
+    ===== 理想平面底盘 =====
+    插件直接接收 Twist 的 vx/vy/wz 并发布 /odom；0.5 s 收不到命令会停。
+    这种模型可验证居中和航向算法，但不能证明真实 Ranger Mini 已完成楔形轮转向。
+  -->
+  <gazebo>
+    <plugin name="ranger_mini_planar_drive" filename="libgazebo_ros_planar_move.so">
+      <robotNamespace>/</robotNamespace>
+      <commandTopic>cmd_vel</commandTopic>
+      <odometryTopic>odom</odometryTopic>
+      <odometryFrame>odom</odometryFrame>
+      <robotBaseFrame>base_footprint</robotBaseFrame>
+      <odometryRate>50.0</odometryRate>
+      <cmdTimeout>0.5</cmdTimeout>
+    </plugin>
+  </gazebo>
+</robot>

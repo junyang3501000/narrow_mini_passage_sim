@@ -1,0 +1,95 @@
+# 该 YAML 是仿真控制器的完整默认配置。所有主要逻辑都由 Python 实现，参数只控制接口、阈值和增益。
+
+# =============================================================================
+# ROS1 接口与坐标系
+# =============================================================================
+lidar_topic: /livox/lidar                 # 输入 sensor_msgs/PointCloud2；每帧必须带正确时间戳/frame。
+odom_topic: /odom                         # 输入 nav_msgs/Odometry；记录任务起始 x、y、yaw 并计算纵向进度。
+cmd_topic: /cmd_vel                       # 输出 geometry_msgs/Twist，直接进入底盘控制链。
+status_topic: /narrow_passage/status      # 输出 std_msgs/String，data 是便于调试的 JSON。
+enable_service: /narrow_mode/enable       # std_srvs/SetBool：true 开新任务，false 立即停止。
+source_frame: livox_frame                 # 期望 PointCloud2.header.frame_id，不一致时拒绝整帧。
+target_frame: base_link                   # 所有几何统一到车体坐标：x 前、y 左、z 上、逆时针为正。
+tf_timeout: 0.08                          # 等待单帧雷达->车体 TF 的最长时间，单位 s。
+enabled_on_start: false                   # 安全默认：避免仅启动 launch 就让仿真车辆突然运动。
+
+# =============================================================================
+# 调度、数据超时与 PointCloud2 预处理
+# =============================================================================
+control_rate: 20.0                        # 控制/安全定时器和 Twist 发布频率，Hz。
+status_rate: 5.0                          # JSON 状态发布频率，Hz；低于控制频率以减少日志压力。
+lidar_timeout: 0.30                       # 最近点云接收时间超过该值时立即发零速度。
+odom_timeout: 0.50                        # 最近里程计接收时间超过该值时立即发零速度。
+point_stride: 5                           # 原始点每 N 个取 1 个；Livox 密集点云用它降低 CPU 占用。
+max_points: 20000                         # 单帧完成 TF/高度过滤后最多送入拟合器的点数。
+min_obstacle_z: -0.30                     # base_link 中保留点的最低高度，单位 m。
+max_obstacle_z: 1.50                      # base_link 中保留点的最高高度，滤除地面和高处结构。
+
+# =============================================================================
+# 简化双墙估计器——前提是车辆已大致朝向窄道
+# =============================================================================
+min_total_points: 30                      # 车辆前方有限点少于此值时认为整帧无效。
+min_side_points: 12                       # 左右每条墙通过 RANSAC 所需的最少内点。
+side_x_min: 0.20                          # 从 base_link 前方 0.20 m 开始寻找墙，避开车体附近回波。
+side_x_max: 4.00                          # 墙面最大前视距离，单位 m。
+min_side_distance: 0.25                   # 排除 |y| 较小的中心带点，避免前障碍混入侧墙。
+max_side_distance: 3.00                   # 墙面候选必须位于车辆左右 3 m 内。
+min_corridor_width: 0.80                  # 两墙法向距离之和低于该值则拒绝。
+max_corridor_width: 2.00                  # 两墙距离之和高于该值则拒绝，避免匹配到远处墙。
+max_wall_heading_deg: 25.0                # 单墙相对车头最大角度，体现“已大致对正”的假设。
+max_parallel_angle_deg: 8.0               # 左右墙方向差上限；超过时不能作为同一通道。
+ransac_iterations: 80                     # 每侧随机取两点生成直线候选的次数。
+ransac_inlier_distance: 0.07              # 点到候选直线不超过 7 cm 才算内点。
+min_wall_span: 0.80                       # 墙内点沿 x 至少覆盖 0.8 m，拒绝短小障碍物。
+fit_sample_limit: 500                     # 每侧最多参与 RANSAC 的均匀采样点数，限制最坏耗时。
+wall_confirm_frames: 3                    # 双墙连续有效三帧后才从等待状态进入 RUNNING。
+
+# =============================================================================
+# 前方障碍急停——这里只停车/恢复，不执行绕行
+# =============================================================================
+front_x_min: 0.05                         # 忽略车体原点及后方点，单位 m。
+front_x_max: 3.00                         # 中央安全带向前观察到 3 m。
+front_half_width: 0.35                    # 中央安全带半宽；总宽 0.70 m，近似含轮胎车宽。
+front_stop_distance: 0.65                 # 最近点不大于此距离时立即进入 OBSTACLE_STOP。
+front_resume_distance: 0.85               # 最近点大于此距离才允许恢复，和停止阈值形成迟滞。
+obstacle_clear_confirm_frames: 3          # 连续多帧确认无障碍，避免单帧漏点造成误恢复。
+
+# =============================================================================
+# 完整矩形 footprint 侧向安全余量
+# 后角净空来自前方回波拟合出的直墙向 x<0 外推，只能预测连续墙，不能感知车后独立障碍。
+# =============================================================================
+footprint_front_extent: 0.42              # base_link 到车体最前端，近似包含前轮外缘。
+footprint_rear_extent: 0.42               # base_link 到车体最后端的正距离，和前端共同闭合矩形。
+footprint_half_width: 0.35                # 真实车体含轮胎半宽；安全余量不混入真实尺寸。
+footprint_emergency_margin: 0.05          # 任一车角到拟合墙≤5 cm；一帧触发即先零速停车。
+footprint_warning_margin: 0.10            # 任一车角到拟合墙≤10 cm；必须大于紧急阈值。
+footprint_warning_forward_speed: 0.12     # 进入预警罩但未进紧急罩时的最大 vx。
+footprint_recovery_lateral_speed: 0.04    # 紧急停车后一律以该低速向净空较大侧横移。
+footprint_clear_confirm_frames: 3         # 连续三帧完全退出预警罩后才恢复正常前进。
+
+# =============================================================================
+# 窄道专用居中/航向控制
+# ey>0：通道中心在车体左侧；e_theta>0：通道方向指向左前方。
+# =============================================================================
+forward_speed: 0.25                       # RUNNING 时固定前进 vx，m/s。
+allow_lateral_motion: true                # true 才输出 linear.y；必须确认真实底盘支持平移模式。
+lateral_kp: 0.50                          # 横移控制：vy = lateral_kp × ey。
+heading_kp: 1.20                          # 航向控制：wz 的主要部分 = heading_kp × e_theta。
+center_angular_kp: 0.00                   # 可选 ey->wz；直接横移时保持 0，避免双重修正。
+lateral_deadband: 0.015                   # |ey|≤1.5 cm 时横移项置零，减少来回抖动。
+heading_deadband_deg: 0.8                 # |e_theta|≤0.8° 时航向项置零。
+max_linear_speed: 0.30                    # 最终 |linear.x| 硬限制，m/s。
+max_lateral_speed: 0.10                   # 最终 |linear.y| 硬限制，m/s。
+max_angular_speed: 0.30                   # 最终 |angular.z| 硬限制，rad/s。
+max_linear_accel: 0.30                    # 前进命令变化率上限，m/s²。
+max_lateral_accel: 0.20                   # 横移命令变化率上限，m/s²。
+max_angular_accel: 0.50                   # 偏航命令变化率上限，rad/s²。
+
+# =============================================================================
+# /odom 任务终止条件
+# 启动时记录 (x0,y0,yaw0)，进度=(当前位置-起点)·(cos(yaw0),sin(yaw0))。
+# 因此横移不增加任务进度，倒车会减少进度，符合“沿入口朝向通过 9 m”的含义。
+# =============================================================================
+passage_distance: 9.0                     # 纵向投影进度达到 9 m 后锁定 SUCCESS 并持续零速度。
+max_odom_step: 0.75                       # 相邻位置跳变超过 0.75 m 时锁定 FAULT，不接受坏数据。
+mission_timeout: 60.0                     # 使能后总时长超过该值时锁定 FAULT，单位 s。

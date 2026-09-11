@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="2">
+  <!-- 自包含包：车辆模型、雷达仿真、窄道控制、参数和测试都在本目录中。 -->
+  <name>ranger_mini_narrow_sim</name>
+  <version>0.1.0</version>
+  <description>Standalone ROS1 narrow-passage controller and Gazebo simulation using a lightweight Ranger Mini proxy.</description>
+
+  <maintainer email="dev@todo.todo">dev</maintainer>
+  <license>Proprietary</license>
+
+  <!-- catkin 负责 Python 脚本和资源文件的工作区安装。 -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- 构建/运行都需要的 ROS 接口依赖。 -->
+  <depend>gazebo_ros</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf2_ros</depend>
+
+  <!-- 仅运行 Gazebo 时才需要：传感器/平面运动插件、TF 发布器和 Xacro 展开器。 -->
+  <exec_depend>gazebo_plugins</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <!-- 没有额外 Gazebo model path 或 pluginlib 描述需要导出。 -->
+  <export/>
+</package>

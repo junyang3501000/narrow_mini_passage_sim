@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="simple_narrow_corridor">
+    <!-- ===== 物理引擎 =====
+         2 ms 步长 × 500 Hz 的目标更新率约等于实时运行，满足 10 Hz 雷达和 20 Hz 控制。 -->
+    <gravity>0 0 -9.81</gravity>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.002</max_step_size>
+      <real_time_update_rate>500</real_time_update_rate>
+    </physics>
+
+    <!-- 只影响可视效果，不影响雷达碰撞射线。 -->
+    <scene>
+      <ambient>0.55 0.55 0.55 1</ambient>
+      <background>0.80 0.85 0.92 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- Gazebo 自带光源和无限地面。 -->
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+
+    <!--
+      ===== 平行窄道 =====
+      两墙中心位于 y=±0.65 m、厚 0.10 m，因此内表面是 ±0.60 m，净宽正好 1.20 m。
+      墙长 14.5 m、中心 x=5.25 m，即大约覆盖 x=-2.0~12.5 m；车辆跑到 9 m 后
+      前方仍有足够墙点供 side_x_max=4 m 的拟合器稳定工作。
+    -->
+    <model name="corridor_walls">
+      <static>true</static>
+      <link name="walls">
+        <!-- collision 决定雷达命中和物理碰撞；visual 只决定画面颜色。 -->
+        <collision name="left_wall_collision">
+          <pose>5.25 0.65 0.50 0 0 0</pose>
+          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+        </collision>
+        <visual name="left_wall_visual">
+          <pose>5.25 0.65 0.50 0 0 0</pose>
+          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <material>
+            <ambient>0.78 0.80 0.83 1</ambient>
+            <diffuse>0.82 0.84 0.87 1</diffuse>
+          </material>
+        </visual>
+        <collision name="right_wall_collision">
+          <pose>5.25 -0.65 0.50 0 0 0</pose>
+          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+        </collision>
+        <visual name="right_wall_visual">
+          <pose>5.25 -0.65 0.50 0 0 0</pose>
+          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <material>
+            <ambient>0.78 0.80 0.83 1</ambient>
+            <diffuse>0.82 0.84 0.87 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      绿色完成线只是视觉标记，不参与碰撞，也不触发停车。
+      真正的 SUCCESS 由 Python 把 /odom 起点位移投影到起始航向后与目标距离比较。
+    -->
+    <model name="finish_line">
+      <static>true</static>
+      <pose>9.0 0 0.006 0 0 0</pose>
+      <link name="finish_marker">
+        <visual name="marker_visual">
+          <geometry><box><size>0.08 1.18 0.01</size></box></geometry>
+          <material>
+            <ambient>0.05 0.65 0.15 1</ambient>
+            <diffuse>0.05 0.75 0.18 1</diffuse>
+            <emissive>0.02 0.12 0.03 1</emissive>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- gzclient 初始相机，从右后上方俯视整个通道；可在 GUI 中自由拖动。 -->
+    <gui fullscreen="0">
+      <camera name="overview">
+        <pose>4.5 -7.0 7.0 0 0.68 1.57</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+  </world>
+</sdf>
