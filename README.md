@@ -21,10 +21,18 @@ ranger_mini_narrow_sim 内置控制器 -> /cmd_vel
 范围为 0°~+19.2°，取自经典 Livox Mid-40 38.4°视场的上半部分。扫描采用规则
 361×9 射线网格，只近似可见范围，不复刻 Livox 的非重复扫描轨迹、反射强度和逐点时间。
 
-## 目录结构
+## Git 仓库与目录结构
+
+Git/GitHub 只管理这个 ROS 包本身。仓库根目录对应 WSL 中的：
 
 ```text
-ranger_mini_narrow_sim/
+/home/junyang/ranger_mini_narrow_sim/src/ranger_mini_narrow_sim
+```
+
+因此 GitHub 首页会直接显示下面这些包文件：
+
+```text
+ranger_mini_narrow_sim/             # Git 仓库根目录，也是 ROS 包根目录
 ├── src/ranger_mini_narrow_sim/    # 墙线拟合、控制、里程、TF、安全和任务状态机
 ├── scripts/                        # 控制节点、点云桥接和仿真验收入口
 ├── config/                         # 完整默认参数与仿真覆盖参数
@@ -37,9 +45,33 @@ ranger_mini_narrow_sim/
 └── package.xml
 ```
 
-## WSL 一次性构建
+外层 `/home/junyang/ranger_mini_narrow_sim` 是本机 catkin 工作空间，不是 Git
+仓库。它包含自动生成的 `build/`、`devel/`、`.catkin_workspace`、
+`src/CMakeLists.txt`，以及本机可选的 `wsl/` 辅助脚本；这些内容不上传 GitHub。
 
-纯 Linux 工作区位于 `/home/junyang/ranger_mini_narrow_sim`，可以直接在 WSL/VS Code 中构建：
+完整的本机层级如下：
+
+```text
+/home/junyang/ranger_mini_narrow_sim/               # catkin 工作空间
+├── build/                                           # catkin_make 自动生成，不进 Git
+├── devel/                                           # catkin_make 自动生成，不进 Git
+├── wsl/                                             # 本机辅助脚本，不进 Git
+└── src/
+    ├── CMakeLists.txt                               # catkin 自动生成，不进 Git
+    └── ranger_mini_narrow_sim/                      # Git/GitHub 同步范围
+```
+
+## WSL 克隆与构建
+
+在新环境中，从 GitHub 克隆时必须把仓库放到 catkin 工作空间的 `src` 下：
+
+```bash
+mkdir -p /home/junyang/ranger_mini_narrow_sim/src
+git clone https://github.com/junyang3501000/narrow_mini_passage_sim.git \
+  /home/junyang/ranger_mini_narrow_sim/src/ranger_mini_narrow_sim
+```
+
+本机已有源码时，从 catkin 工作空间根目录构建：
 
 ```bash
 cd /home/junyang/ranger_mini_narrow_sim
@@ -48,7 +80,17 @@ catkin_make
 source devel/setup.bash
 ```
 
-只把本目录复制到工作区的 `src` 中即可；不需要再复制任何其他自制功能包。
+该工作空间的 `src` 下只需要这一个自制 ROS 包，不需要
+`simple_narrow_passage` 或其他相邻功能包。
+
+提交、拉取和推送代码时，则进入包目录（Git 仓库根目录）：
+
+```bash
+cd /home/junyang/ranger_mini_narrow_sim/src/ranger_mini_narrow_sim
+git status
+git pull
+git push
+```
 
 ## 启动
 
