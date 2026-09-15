@@ -105,7 +105,7 @@ roslaunch ranger_mini_narrow_sim narrow_passage_sim.launch gui:=true auto_enable
 保持第一个终端运行，再打开第二个已经 source 工作区的 WSL 终端，使能或停止：
 
 ```bash
-rosservice call /narrow_mode/enable "data: true"   # 开始一次 9 m 任务
+rosservice call /narrow_mode/enable "data: true"   # 开始一次 10 m 任务
 rosservice call /narrow_mode/enable "data: false"  # 随时停车并退出窄道模式
 ```
 
@@ -128,9 +128,10 @@ roslaunch ranger_mini_narrow_sim narrow_passage_sim.launch \
   gui:=false auto_enable:=true run_test:=true
 ```
 
-自检会从带 0.12 m 横向偏移、约 3.4° 航向偏差的初始位姿开始，等待点云和里程计，调用
-使能服务，确认经历 `running`，最后在起始航向纵向投影达到 9 m 后进入 `success`。失败时会打印最后状态和
-里程快照。
+自检会让完整车体出生在两堵墙的入口外：车体中心 `x=-0.45 m`，横向偏移 0.12 m，
+车头带约 3.4° 航向偏差。墙从 `x=0` 延伸到 `x=10 m`；车辆完成居中、对正并走满
+10 m 后，车头到达出口线并进入 `success`。出口前向墙点自然消失时，仿真只允许在最后
+1 m 范围内保持直行，TF/点云处理故障仍会立即停车。失败时会打印最后状态和里程快照。
 
 ## 观察接口
 
@@ -142,7 +143,7 @@ rostopic info /cmd_vel
 ```
 
 完整默认参数在 `config/controller_defaults.yaml`，仿真差异参数在
-`config/simulation.yaml`。默认窄道净宽 1.20 m、速度 0.25 m/s、任务距离 9 m。
+`config/simulation.yaml`。默认窄道净宽 1.20 m、墙长/任务距离 10 m、速度 0.25 m/s。
 
 ## 完整矩形 footprint 两级安全余量验证
 
@@ -160,7 +161,7 @@ rostopic info /cmd_vel
 ```bash
 rostopic echo /narrow_passage/status
 # footprint_zone: clear / warning / emergency / unknown
-# state: running / side_recovery / obstacle_stop / ...
+# state: running / exiting / side_recovery / obstacle_stop / ...
 ```
 
 这层逻辑在本包 `src/ranger_mini_narrow_sim` 的 Python 模块内完成，不依赖
@@ -173,5 +174,5 @@ move_base、SLAM、二维 costmap 或工作区中的其他自制包，适合当�
 roslaunch ranger_mini_narrow_sim footprint_recovery_test.launch gui:=false
 ```
 
-该测试把车辆放在距右墙约 3 cm 的位置，除了最终 9 m 成功条件外，还强制检查运行中确实
+该测试把车辆放在距右墙约 3 cm 的位置，除了最终 10 m 成功条件外，还强制检查运行中确实
 出现过 `side_recovery`，避免车辆未触发安全罩却被误判为通过。

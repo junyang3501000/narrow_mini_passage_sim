@@ -21,7 +21,7 @@ class DistanceTrackerTest(unittest.TestCase):
         self.assertAlmostEqual(update.distance, 1.6)
 
     def test_backward_motion_reduces_progress(self):
-        """纵向进度是有符号投影，倒车不能帮助达到正向 9 m 目标。"""
+        """纵向进度是有符号投影，倒车不能帮助达到正向目标。"""
 
         tracker = DistanceTracker(max_step=2.0)
         tracker.reset(1.0, 2.0, 0.0)

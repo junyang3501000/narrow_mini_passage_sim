@@ -22,11 +22,22 @@ class NodeConfigTest(unittest.TestCase):
 
         config = load_node_config(get_param)
         self.assertEqual(config.source_frame, "livox_frame")
+        self.assertEqual(config.passage_distance, 10.0)
+        self.assertEqual(config.exit_coast_distance, 0.0)
         self.assertEqual(config.safety.wall_confirm_frames, 3)
         WallEstimator(config.estimator)
         NarrowController(config.controller)
         CommandSlewLimiter(config.slew)
         SafetySupervisor(config.safety)
+
+    def test_exit_coast_distance_cannot_be_negative(self):
+        """通用默认可关闭出口续行，但负距离属于无效配置。"""
+
+        def get_param(name, default):
+            return -0.1 if name == "~exit_coast_distance" else default
+
+        with self.assertRaises(ValueError):
+            load_node_config(get_param)
 
 
 if __name__ == "__main__":

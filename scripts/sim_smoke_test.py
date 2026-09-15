@@ -51,8 +51,14 @@ class SimulationMonitor:
             self._state = status.get("state")
             self._reason = status.get("reason")
             self._reported_distance = float(status.get("distance", 0.0))
-            self._lateral_error = status.get("ey")
-            self._heading_error = status.get("e_theta")
+            # 出口续行时前向雷达会自然失去两侧墙，最终状态中的误差为 null；
+            # 保留最后一次有效墙观测，用它验收进入出口前已经完成居中和对正。
+            lateral_error = status.get("ey")
+            heading_error = status.get("e_theta")
+            if lateral_error is not None:
+                self._lateral_error = lateral_error
+            if heading_error is not None:
+                self._heading_error = heading_error
             # 三个速度分量中的最大绝对值可判断最终停车指令是否完全归零。
             self._command_norm = max(
                 abs(float(status.get("linear_x", 0.0))),
@@ -105,7 +111,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--timeout", type=float, default=80.0)
-    parser.add_argument("--minimum-distance", type=float, default=8.75)
+    parser.add_argument("--minimum-distance", type=float, default=9.75)
     parser.add_argument(
         "--require-side-recovery",
         action="store_true",

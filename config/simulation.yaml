@@ -60,6 +60,7 @@ footprint_warning_margin: 0.10          # 四角最小拟合墙净空不大于 1
 footprint_warning_forward_speed: 0.12   # 预警状态仍保持低速向前并继续修正。
 footprint_recovery_lateral_speed: 0.04  # 紧急停车后一拍，以 4 cm/s 向通道安全侧横移。
 footprint_clear_confirm_frames: 3       # 10 Hz 雷达连续约 0.3 s 安全后恢复正常 vx。
-passage_distance: 9.0                   # 沿任务起始航向的 odom 投影达到 9 m 后进入 SUCCESS。
+passage_distance: 10.0                  # 入口外出生；走满 10 m 时车头到达 x=10 出口线。
+exit_coast_distance: 1.0                # 距终点 1 m 内若双墙从前向视场消失，保持直行至出口。
 mission_timeout: 75.0                   # 任务总超时；包含等待传感器和障碍停车时间。
 max_odom_step: 0.75                     # 相邻 odom 跳变超过 0.75 m 时锁定 FAULT。

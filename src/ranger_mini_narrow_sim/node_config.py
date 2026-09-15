@@ -26,6 +26,7 @@ class NodeConfig:
     odom_timeout: float
     mission_timeout: float
     passage_distance: float
+    exit_coast_distance: float
     max_odom_step: float
     point_stride: int
     max_points: int
@@ -61,6 +62,15 @@ def _positive_int(get_param: ParamGetter, name: str, default: int) -> int:
     value = int(get_param(name, default))
     if value <= 0:
         raise ValueError("{} must be positive".format(name))
+    return value
+
+
+def _nonnegative(get_param: ParamGetter, name: str, default: float) -> float:
+    """读取有限非负浮点数；0 用于显式关闭可选功能。"""
+
+    value = float(get_param(name, default))
+    if not math.isfinite(value) or value < 0.0:
+        raise ValueError("{} must be finite and non-negative".format(name))
     return value
 
 
@@ -177,7 +187,10 @@ def load_node_config(get_param: ParamGetter) -> NodeConfig:
         lidar_timeout=_positive(get_param, "~lidar_timeout", 0.30),
         odom_timeout=_positive(get_param, "~odom_timeout", 0.50),
         mission_timeout=_positive(get_param, "~mission_timeout", 60.0),
-        passage_distance=_positive(get_param, "~passage_distance", 9.0),
+        passage_distance=_positive(get_param, "~passage_distance", 10.0),
+        exit_coast_distance=_nonnegative(
+            get_param, "~exit_coast_distance", 0.0
+        ),
         max_odom_step=_positive(get_param, "~max_odom_step", 0.75),
         point_stride=_positive_int(get_param, "~point_stride", 5),
         max_points=_positive_int(get_param, "~max_points", 20000),

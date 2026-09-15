@@ -9,14 +9,15 @@
   <arg name="auto_enable" default="false"/>
   <!-- CI 兼容入口；通常由 wsl/test_ros1_sim.sh 使用独立监测节点完成验收。 -->
   <arg name="run_test" default="false"/>
-  <!-- 起点位移在任务起始车头方向上的投影达到该值后锁定 SUCCESS。 -->
-  <arg name="passage_distance" default="9.0"/>
+  <!-- 车头从 x=0 入口到 x=10 出口对应约 10 m；达到该投影里程后锁定 SUCCESS。 -->
+  <arg name="passage_distance" default="10.0"/>
 
   <!-- ===== 初始位姿 =====
        base_link 坐标约定：x 向前、y 向左、yaw 逆时针为正。
+       x=-0.45 使带偏角的完整车体刚好处于 x=0 入口外侧。
        y=-0.12 表示车在中心线右侧，yaw=0.06 rad≈3.4°，用于同时验证居中和航向闭环。 -->
-  <arg name="spawn_x" default="0.0"/>
-  <arg name="spawn_y" default="-0.12"/>
+  <arg name="spawn_x" default="-0.45"/>
+  <arg name="spawn_y" default="-0.17"/>
   <arg name="spawn_yaw" default="0.06"/>
 
   <!-- 所有 rospy.Timer、超时和消息时间戳使用 Gazebo 发布的 /clock，而非电脑墙钟。 -->
@@ -83,12 +84,12 @@
 
   <!-- ===== 可选内嵌验收节点 =====
        required=true 表示验收进程结束后整个 launch 一起退出，适合无人值守运行。
-       minimum-distance=8.75 给 9 m 目标留出状态发布/采样时序余量。 -->
+       minimum-distance=9.75 给 10 m 目标留出状态发布/采样时序余量。 -->
   <node if="$(arg run_test)"
         pkg="ranger_mini_narrow_sim"
         type="sim_smoke_test.py"
         name="narrow_passage_smoke_test"
         output="screen"
         required="true"
-        args="--timeout 80 --minimum-distance 8.75"/>
+        args="--timeout 80 --minimum-distance 9.75"/>
 </launch>

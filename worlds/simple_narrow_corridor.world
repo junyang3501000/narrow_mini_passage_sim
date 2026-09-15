@@ -23,32 +23,32 @@
     <!--
       ===== 平行窄道 =====
       两墙中心位于 y=±0.65 m、厚 0.10 m，因此内表面是 ±0.60 m，净宽正好 1.20 m。
-      墙长 14.5 m、中心 x=5.25 m，即大约覆盖 x=-2.0~12.5 m；车辆跑到 9 m 后
-      前方仍有足够墙点供 side_x_max=4 m 的拟合器稳定工作。
+      墙长严格为 10.0 m、中心 x=5.0 m，即入口 x=0、出口 x=10。
+      小车出生在入口外，车头从入口线进入后到出口线正好对应约 10 m 的墙内行程。
     -->
     <model name="corridor_walls">
       <static>true</static>
       <link name="walls">
         <!-- collision 决定雷达命中和物理碰撞；visual 只决定画面颜色。 -->
         <collision name="left_wall_collision">
-          <pose>5.25 0.65 0.50 0 0 0</pose>
-          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <pose>5.0 0.65 0.50 0 0 0</pose>
+          <geometry><box><size>10.0 0.10 1.0</size></box></geometry>
         </collision>
         <visual name="left_wall_visual">
-          <pose>5.25 0.65 0.50 0 0 0</pose>
-          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <pose>5.0 0.65 0.50 0 0 0</pose>
+          <geometry><box><size>10.0 0.10 1.0</size></box></geometry>
           <material>
             <ambient>0.78 0.80 0.83 1</ambient>
             <diffuse>0.82 0.84 0.87 1</diffuse>
           </material>
         </visual>
         <collision name="right_wall_collision">
-          <pose>5.25 -0.65 0.50 0 0 0</pose>
-          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <pose>5.0 -0.65 0.50 0 0 0</pose>
+          <geometry><box><size>10.0 0.10 1.0</size></box></geometry>
         </collision>
         <visual name="right_wall_visual">
-          <pose>5.25 -0.65 0.50 0 0 0</pose>
-          <geometry><box><size>14.5 0.10 1.0</size></box></geometry>
+          <pose>5.0 -0.65 0.50 0 0 0</pose>
+          <geometry><box><size>10.0 0.10 1.0</size></box></geometry>
           <material>
             <ambient>0.78 0.80 0.83 1</ambient>
             <diffuse>0.82 0.84 0.87 1</diffuse>
@@ -63,7 +63,7 @@
     -->
     <model name="finish_line">
       <static>true</static>
-      <pose>9.0 0 0.006 0 0 0</pose>
+      <pose>10.0 0 0.006 0 0 0</pose>
       <link name="finish_marker">
         <visual name="marker_visual">
           <geometry><box><size>0.08 1.18 0.01</size></box></geometry>
@@ -79,7 +79,7 @@
     <!-- gzclient 初始相机，从右后上方俯视整个通道；可在 GUI 中自由拖动。 -->
     <gui fullscreen="0">
       <camera name="overview">
-        <pose>4.5 -7.0 7.0 0 0.68 1.57</pose>
+        <pose>4.75 -7.0 7.0 0 0.68 1.57</pose>
         <view_controller>orbit</view_controller>
       </camera>
     </gui>

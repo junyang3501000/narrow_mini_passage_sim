@@ -16,11 +16,11 @@
     <arg name="spawn_yaw" value="0.0"/>
   </include>
 
-  <!-- 除 9 m 成功条件外，还必须实际观察到 side_recovery 状态。 -->
+  <!-- 除 10 m 成功条件外，还必须实际观察到 side_recovery 状态。 -->
   <node pkg="ranger_mini_narrow_sim"
         type="sim_smoke_test.py"
         name="footprint_recovery_smoke_test"
         output="screen"
         required="true"
-        args="--timeout 90 --minimum-distance 8.75 --require-side-recovery"/>
+        args="--timeout 90 --minimum-distance 9.75 --require-side-recovery"/>
 </launch>

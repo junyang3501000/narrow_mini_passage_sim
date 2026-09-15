@@ -3,7 +3,7 @@
   <!-- 是否打开 gzclient 图形窗口；false 时仍运行无界面的 gzserver。 -->
   <arg name="gui" default="true"/>
   <!-- 本次任务纵向投影进度目标，透传给主仿真 launch。 -->
-  <arg name="passage_distance" default="9.0"/>
+  <arg name="passage_distance" default="10.0"/>
 
   <!--
     演示文件不重复定义任何节点，而是复用主启动文件，并唯一地把 auto_enable 改为 true。

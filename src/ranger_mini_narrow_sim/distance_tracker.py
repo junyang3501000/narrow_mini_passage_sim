@@ -13,9 +13,9 @@ from typing import Optional, Tuple
 class DistanceUpdate:
     """每次输入 odom 位置后的结果；拒绝时 distance 保持原值。"""
 
-    accepted: bool
-    distance: float
-    reason: str = ""
+    accepted: bool # 是否接受
+    distance: float # 进度
+    reason: str = "" # 拒绝原因
 
 
 class DistanceTracker:

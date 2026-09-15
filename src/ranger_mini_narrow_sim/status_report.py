@@ -63,6 +63,7 @@ def build_status(
         "distance": distance,
         "distance_mode": "start_heading_projection",
         "target_distance": config.passage_distance,
+        "exit_coast_distance": config.exit_coast_distance,
         "linear_x": command.linear_x,
         "linear_y": command.linear_y,
         "angular_z": command.angular_z,

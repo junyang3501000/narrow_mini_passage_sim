@@ -15,12 +15,14 @@ class PassageState(Enum):
 
     SUCCESS 和 FAULT 是锁定状态：控制节点会持续输出零速度，直到再次使能开始新任务。
     OBSTACLE_STOP 不是故障，障碍清除并满足迟滞确认后可以自动回到 RUNNING；
-    SIDE_RECOVERY 会在紧急停车后只允许安全方向的低速横移。
+    SIDE_RECOVERY 会在紧急停车后只允许安全方向的低速横移；EXITING 只用于已经接近
+    目标且前向雷达自然越过墙端后的有限直行。
     """
 
     DISABLED = "disabled"                 # 未使能；无论传感器是否正常都输出零速度。
     WAITING_SENSORS = "waiting_sensors"   # 等待新鲜点云、odom、TF 或连续有效双墙。
     RUNNING = "running"                   # 所有安全条件满足，允许发布跟踪命令。
+    EXITING = "exiting"                   # 已确认临近出口，墙消失后有限距离直行。
     OBSTACLE_STOP = "obstacle_stop"       # 前方安全带发现近障碍，立即停车但可恢复。
     SIDE_RECOVERY = "side_recovery"       # 完整 footprint 紧急余量触发后，仅低速横移。
     SUCCESS = "success"                   # 纵向投影进度达到目标，锁定停车。
